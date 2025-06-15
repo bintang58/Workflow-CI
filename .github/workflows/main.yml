@@ -80,7 +80,7 @@ jobs:
             GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
         run: |
             echo "$GOOGLE_DRIVE_CREDENTIALS" > service-account.json
-            python MLProject/upload_to_drive.py
+            python upload_to_drive.py
 
       # 10. Build Docker Model
       - name: Build Docker Model
