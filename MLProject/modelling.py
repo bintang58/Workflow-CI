@@ -26,13 +26,13 @@ def setup_mlflow():
         os.environ['MLFLOW_TRACKING_USERNAME'] = os.environ['DAGSHUB_USERNAME']
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.environ['DAGSHUB_TOKEN']
         mlflow.set_tracking_uri("https://dagshub.com/bintang58/diabetes-prediction-model.mlflow")
-        mlflow.set_experiment("diabetes-prediction-experiment")
+        mlflow.set_experiment("logistic_regression_experiment_remote")
         print("✅ Using remote MLflow tracking on DagsHub")
         return True
     else:
         os.makedirs('mlruns', exist_ok=True)
         mlflow.set_tracking_uri("file:./mlruns")
-        mlflow.set_experiment("diabetes-prediction-experiment-local")
+        mlflow.set_experiment("logistic_regression_experiment_local")
         print("✅ MLflow tracking tersimpan secara lokal di: ./mlruns")
         return False
 
