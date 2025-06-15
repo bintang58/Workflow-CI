@@ -1,0 +1,112 @@
+name: MLflow CI Workflow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mlflow-run:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Set up Job
+      - name: Set up job
+        run: echo "🛠️Setting up MLflow CI job..."
+
+      # 2. Run actions/checkout@v3
+      - name: Run actions/checkout@v3
+        uses: actions/checkout@v3
+    
+      # 3. Set up Python 3.12.7
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.7'
+
+      # 4. Check Env
+      - name: Check Env
+        run: |
+          echo "Python Version: $(python --version)"
+          echo "PIP Version: $(pip --version)"
+          echo "Environment Variables:"
+          env | sort
+
+      # 5. Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn mlflow seaborn matplotlib google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          if [ -f MLProject/requirements.txt ]; then
+            pip install -r MLProject/requirements.txt
+          fi
+
+      # 6. Run mlflow project
+      - name: Run mlflow project
+        shell: bash -l {0}
+        working-directory: ./MLProject
+        env:
+            DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+            DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+        run: |
+            mlflow run . -P data_path=diabetes-prediction_preprocessing.csv
+    
+      # 7. Get latest MLflow run_id
+      - name: Get latest MLflow run_id
+        working-directory: ./MLProject
+        run: |
+          RUN_ID=$(mlflow runs list -v | grep -v 'Run ID' | head -1 | awk '{print $4}')
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Latest MLflow run_id: $RUN_ID"
+
+      # 8. Install Python dependencies
+      - name: Install Python dependencies
+        run: echo "Dependencies already installed above"
+
+      # 9. Upload to Google Drive
+      - name: Upload to Google Drive
+        env:
+            GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+        run: |
+            echo "$GOOGLE_DRIVE_CREDENTIALS" > service-account.json
+            python MLProject/upload_to_drive.py
+
+      # 10. Build Docker Model
+      - name: Build Docker Model
+        uses: docker/build-push-action@v4
+        with:
+            context: ./MLProject
+            push: false
+            tags: mlflow-ci-model:latest
+
+      # 11. Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
+
+      # 12. Tag Docker Image
+      - name: Tag Docker Image
+        run: |
+          docker tag mlflow-ci-model:latest ${{ secrets.DOCKER_USERNAME }}/mlflow-ci-model:latest
+
+      # 13. Push Docker Image
+      - name: Push Docker Image
+        run: |
+            docker push ${{ secrets.DOCKER_USERNAME }}/mlflow-ci-model:latest
+        
+      # 14. Post Log in to Docker Hub
+      - name: Post Log in to Docker Hub
+        run: echo "Post Log in to Docker Hub step completed"
+
+      # 15. Post Set up Python 3.12.7
+      - name: Post Set up Python 3.12.7
+        run: echo "Post setup Python step completed"
+
+      # 16. Post Run actions/checkout@v3
+      - name: Post Run actions/checkout@v3
+        run: echo "Post checkout step completed"
+
+      # 17. Complete Job
+      - name: Complete Job
+        run: echo "✅ MLflow CI job completed successfully!"

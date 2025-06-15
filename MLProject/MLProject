@@ -1,0 +1,17 @@
+name: diabetes-prediction-model
+
+conda_env: conda.yaml
+
+entry_points:
+  run_model:
+    parameters:
+      data_path: {type: str}
+      test_size: {type: float, default: 0.2}
+      random_state: {type: int, default: 42}
+      model_output: {type: str, default: "models/diabetes-prediction-model.pkl"}
+    command: >
+      python modelling.py
+      --data_path {data_path}
+      --test_size {test_size}
+      --random_state {random_state}
+      --model_output {model_output}
