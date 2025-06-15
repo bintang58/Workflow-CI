@@ -125,10 +125,16 @@ def main(args):
         model_path_uri = f"runs:/{run_id}/model"
         model_registry_name = "diabetes-prediction-model"
 
-        try:
-            register_model_with_retry(model_uri=model_path_uri, model_name=model_registry_name)
-        except Exception as error:
-            print(f"❌ Registrasi model gagal meskipun sudah di-retry: {error}")
+        # Cek apakah di environment CI (GitHub Actions)
+        in_ci = os.getenv('GITHUB_ACTIONS') == 'true'
+
+        if not in_ci:
+            try:
+                register_model_with_retry(model_uri=model_path_uri, model_name=model_registry_name)
+            except Exception as error:
+                print(f"❌ Registrasi model gagal meskipun sudah di-retry: {error}")
+        else:
+            print("⚠️ Skipping model registration in CI environment to avoid DagsHub errors.")
 
         # Informasi untuk serving
         if use_remote_tracking:
