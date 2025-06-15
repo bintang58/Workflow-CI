@@ -11,4 +11,10 @@ dependencies:
   - scikit-learn==1.7.0
   - scipy==1.15.3
   - dagshub==0.5.10
+  - seaborn==0.13.2
+  - matplotlib==3.10.3
+  - google-api-python-client==2.172.0
+  - google-auth-httplib2==0.2.0
+  - google-auth-oauthlib==1.2.2
+  - joblib==1.5.1
 name: mlflow-env
