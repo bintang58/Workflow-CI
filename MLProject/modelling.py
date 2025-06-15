@@ -90,7 +90,7 @@ def main(args):
         print(f"🚀 MLflow Run ID: {run_id}")
 
         # Train model
-        model = LogisticRegression(random_state=args.random_state, max_iter=500)
+        model = LogisticRegression(random_state=args.random_state)
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 

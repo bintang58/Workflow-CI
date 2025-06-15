@@ -57,7 +57,9 @@ jobs:
             DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
             DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
         run: |
-            mlflow run . -e run_model -P data_path=diabetes-prediction_preprocessing.csv
+            mlflow run . -e run_model \
+              -P data_path=diabetes-prediction_preprocessing.csv \
+              -P model_output=models/diabetes-prediction-model.pkl
     
       # 7. Get latest MLflow run_id
       - name: Get latest MLflow run_id
