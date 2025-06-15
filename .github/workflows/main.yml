@@ -75,6 +75,7 @@ jobs:
 
       # 9. Upload to Google Drive
       - name: Upload to Google Drive
+        working-directory: ./MLProject
         env:
             GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
         run: |
