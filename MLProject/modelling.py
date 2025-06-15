@@ -37,6 +37,21 @@ def setup_mlflow():
         print("⚠️ MLflow tracking fallback to local: ./mlruns")
         return False
 
+def start_run_with_retry(max_retries=5, wait_seconds=5):
+    """Start MLflow run with retry mechanism for handling connection errors."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"🔄 Attempt {attempt} to start MLflow run...")
+            return mlflow.start_run()
+        except Exception as e:
+            print(f"⚠️ Attempt {attempt} failed to start run: {e}")
+            if attempt < max_retries:
+                print(f"⏳ Retrying in {wait_seconds} seconds...")
+                time.sleep(wait_seconds)
+            else:
+                print("❌ Maximum retry attempts reached. Failed to start MLflow run.")
+                raise e
+
 def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds=5):
     """Register MLflow model with retry mechanism for handling 500 errors."""
     for attempt in range(1, max_retries + 1):
@@ -70,7 +85,7 @@ def main(args):
 
     mlflow.sklearn.autolog()
 
-    with mlflow.start_run() as run:
+    with start_run_with_retry() as run:
         run_id = run.info.run_id
         print(f"🚀 MLflow Run ID: {run_id}")
 
