@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import mlflow
 import mlflow.sklearn
+import time
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
@@ -34,6 +35,23 @@ def setup_mlflow():
         mlflow.set_experiment("diabetes-prediction-experiment-local")
         print("✅ MLflow tracking tersimpan secara lokal di: ./mlruns")
         return False
+
+def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds=5):
+    """Register MLflow model with retry mechanism."""
+    for attempt in range(max_retries):
+        try:
+            print(f"🔄 Attempt {attempt + 1} to register model...")
+            result = mlflow.register_model(model_uri=model_uri, name=model_name)
+            print("✅ Model registered successfully!")
+            return result
+        except Exception as e:
+            print(f"⚠️ Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"⏳ Retrying in {wait_seconds} seconds...")
+                time.sleep(wait_seconds)
+            else:
+                print("❌ Maximum retry attempts reached. Model registration failed.")
+                raise e
 
 def main(args):
     # Setup MLflow tracking
@@ -103,17 +121,16 @@ def main(args):
         mlflow.log_artifact(args.model_output)
         print(f"✅ Model disimpan ke: {args.model_output}")
 
-        # Registrasi model ke MLflow Model Registry
+        # Registrasi model ke MLflow Model Registry dengan retry
         model_path_uri = f"runs:/{run_id}/model"
         model_registry_name = "diabetes-prediction-model"
 
         try:
-            mlflow.register_model(model_uri=model_path_uri, name=model_registry_name)
-            print(f"✅ Model sukses diregistrasi dengan nama: '{model_registry_name}'")
+            register_model_with_retry(model_uri=model_path_uri, model_name=model_registry_name)
         except Exception as error:
-            print(f"❌ Registrasi model gagal: {error}")
+            print(f"❌ Registrasi model gagal meskipun sudah di-retry: {error}")
 
-        # Informasi untuk melakukan serving model
+        # Informasi untuk serving
         if use_remote_tracking:
             print("\n🌐 Tracking MLflow tersedia di DagsHub:")
             print("🔗 https://dagshub.com/bintang58/diabetes-prediction-model.mlflow")
@@ -122,7 +139,6 @@ def main(args):
         else:
             print("\n💻 Jalankan perintah berikut untuk serving model secara lokal:")
             print(f"mlflow models serve -m '{model_path_uri}' --port 5000")
-
 
         # Clean up artifacts
         for file in [report_path, cm_path]:
