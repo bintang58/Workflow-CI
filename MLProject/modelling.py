@@ -17,15 +17,16 @@ from sklearn.metrics import (
 def load_data(data_path):
     """Load dataset from the specified path."""
     if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Data file not found at {data_path}")
+        raise FileNotFoundError(f"❌ Data file not found at {data_path}")
     return pd.read_csv(data_path)
 
 def setup_mlflow():
     """Setup MLflow tracking, remote (DagsHub) or local."""
-    if os.environ.get('DAGSHUB_TOKEN') and os.environ.get('DAGSHUB_USERNAME'):
-        os.environ['MLFLOW_TRACKING_USERNAME'] = os.environ['DAGSHUB_USERNAME']
-        os.environ['MLFLOW_TRACKING_PASSWORD'] = os.environ['DAGSHUB_TOKEN']
-        mlflow.set_tracking_uri("https://dagshub.com/bintang58/diabetes-prediction-model.mlflow")
+    dagshub_uri = "https://dagshub.com/bintang58/diabetes-prediction-model.mlflow"
+    if os.getenv('DAGSHUB_TOKEN') and os.getenv('DAGSHUB_USERNAME'):
+        os.environ['MLFLOW_TRACKING_USERNAME'] = os.getenv('DAGSHUB_USERNAME')
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv('DAGSHUB_TOKEN')
+        mlflow.set_tracking_uri(dagshub_uri)
         mlflow.set_experiment("logistic_regression_experiment_remote")
         print("✅ Using remote MLflow tracking on DagsHub")
         return True
@@ -33,20 +34,20 @@ def setup_mlflow():
         os.makedirs('mlruns', exist_ok=True)
         mlflow.set_tracking_uri("file:./mlruns")
         mlflow.set_experiment("logistic_regression_experiment_local")
-        print("✅ MLflow tracking tersimpan secara lokal di: ./mlruns")
+        print("⚠️ MLflow tracking fallback to local: ./mlruns")
         return False
 
 def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds=5):
-    """Register MLflow model with retry mechanism."""
-    for attempt in range(max_retries):
+    """Register MLflow model with retry mechanism for handling 500 errors."""
+    for attempt in range(1, max_retries + 1):
         try:
-            print(f"🔄 Attempt {attempt + 1} to register model...")
+            print(f"🔄 Attempt {attempt} to register model...")
             result = mlflow.register_model(model_uri=model_uri, name=model_name)
             print("✅ Model registered successfully!")
             return result
         except Exception as e:
-            print(f"⚠️ Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
+            print(f"⚠️ Attempt {attempt} failed: {e}")
+            if attempt < max_retries:
                 print(f"⏳ Retrying in {wait_seconds} seconds...")
                 time.sleep(wait_seconds)
             else:
@@ -54,7 +55,6 @@ def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds
                 raise e
 
 def main(args):
-    # Setup MLflow tracking
     use_remote_tracking = setup_mlflow()
 
     # Load dataset
@@ -66,16 +66,16 @@ def main(args):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=args.test_size, random_state=args.random_state
     )
-
-    print(f"📊 Training set shape: {X_train.shape}, Test set shape: {X_test.shape}")
+    print(f"📊 Training set: {X_train.shape}, Test set: {X_test.shape}")
 
     mlflow.sklearn.autolog()
 
     with mlflow.start_run() as run:
         run_id = run.info.run_id
+        print(f"🚀 MLflow Run ID: {run_id}")
 
         # Train model
-        model = LogisticRegression(random_state=args.random_state)
+        model = LogisticRegression(random_state=args.random_state, max_iter=500)
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
@@ -85,16 +85,19 @@ def main(args):
         precision = precision_score(y_test, y_pred)
         recall = recall_score(y_test, y_pred)
 
-        # Log metrics
-        mlflow.log_metric("accuracy", accuracy)
-        mlflow.log_metric("f1_score", f1)
-        mlflow.log_metric("precision", precision)
-        mlflow.log_metric("recall", recall)
+        mlflow.log_metrics({
+            "accuracy": accuracy,
+            "f1_score": f1,
+            "precision": precision,
+            "recall": recall
+        })
 
         # Log params
-        mlflow.log_param("model_type", "LogisticRegression")
-        mlflow.log_param("test_size", args.test_size)
-        mlflow.log_param("random_state", args.random_state)
+        mlflow.log_params({
+            "model_type": "LogisticRegression",
+            "test_size": args.test_size,
+            "random_state": args.random_state
+        })
 
         # Classification report
         report = classification_report(y_test, y_pred)
@@ -119,34 +122,34 @@ def main(args):
         os.makedirs(os.path.dirname(args.model_output), exist_ok=True)
         joblib.dump(model, args.model_output)
         mlflow.log_artifact(args.model_output)
-        print(f"✅ Model disimpan ke: {args.model_output}")
+        print(f"✅ Model saved at: {args.model_output}")
 
-        # Registrasi model ke MLflow Model Registry dengan retry
-        model_path_uri = f"runs:/{run_id}/model"
-        model_registry_name = "diabetes-prediction-model"
+        # Model Registry
+        model_uri = f"runs:/{run_id}/model"
+        model_name = "diabetes-prediction-model"
 
         try:
-            register_model_with_retry(model_uri=model_path_uri, model_name=model_registry_name)
+            register_model_with_retry(model_uri=model_uri, model_name=model_name)
         except Exception as error:
-            print(f"❌ Registrasi model gagal meskipun sudah di-retry: {error}")
+            print(f"❌ Model registry failed after retries: {error}")
 
-        # Informasi untuk serving
+        # Info
         if use_remote_tracking:
-            print("\n🌐 Tracking MLflow tersedia di DagsHub:")
+            print("\n🌐 MLflow Tracking on DagsHub:")
             print("🔗 https://dagshub.com/bintang58/diabetes-prediction-model.mlflow")
-            print("🚀 Jalankan perintah berikut untuk serving model dari DagsHub:")
-            print(f" mlflow models serve -m 'models:/{model_registry_name}/latest' --port 5000")
+            print("🚀 Serve Model Command:")
+            print(f"mlflow models serve -m 'models:/{model_name}/latest' --port 5000")
         else:
-            print("\n💻 Jalankan perintah berikut untuk serving model secara lokal:")
-            print(f"mlflow models serve -m '{model_path_uri}' --port 5000")
+            print("\n💻 Serve Locally:")
+            print(f"mlflow models serve -m '{model_uri}' --port 5000")
 
-        # Clean up artifacts
+        # Cleanup
         for file in [report_path, cm_path]:
             if os.path.exists(file):
                 os.remove(file)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Training Logistic Regression untuk prediksi diabetes")
+    parser = argparse.ArgumentParser(description="Train Logistic Regression for Diabetes Prediction")
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--test_size", type=float, default=0.2)
     parser.add_argument("--random_state", type=int, default=42)
