@@ -27,7 +27,22 @@ def upload_file_to_drive():
             fields='id'
         ).execute()
 
-        print(f"✅ File berhasil diupload ke Google Drive dengan ID: {file.get('id')}")
+        file_id = file.get('id')  # Simpan ID di variabel dulu
+        print(f"✅ File berhasil diupload ke Google Drive dengan ID: {file_id}")
+
+        # Mengatur permission: file bisa dilihat semua orang dengan link
+        permission = {
+            'type': 'anyone',
+            'role': 'reader'
+        }
+        drive_service.permissions().create(
+            fileId=file_id,
+            body=permission
+        ).execute()
+
+        # Tampilkan link akses
+        file_url = f"https://drive.google.com/file/d/{file_id}/view"
+        print(f"🔗 File dapat diakses di: {file_url}")
 
     except Exception as e:
         print(f"❌ Terjadi error saat upload ke Google Drive: {e}")
