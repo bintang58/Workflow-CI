@@ -1,0 +1,15 @@
+artifact_uri: file:C:/Users/zerob/Documents/Laskar AI/Membangun Sistem Machine Learning/Workflow-CI/MLProject/mlruns/204591613997183841/9ca957270021469fbcfc05e53ad11867/artifacts
+end_time: 1750044624411
+entry_point_name: ''
+experiment_id: '204591613997183841'
+lifecycle_stage: active
+run_id: 9ca957270021469fbcfc05e53ad11867
+run_name: LogisticRegression_GridSearchCV
+run_uuid: 9ca957270021469fbcfc05e53ad11867
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750044595000
+status: 3
+tags: []
+user_id: Bintang

@@ -1,7 +1,0 @@
-artifact_location: file:C:/Users/zerob/Documents/Laskar AI/Membangun Sistem Machine
-  Learning/Workflow-CI/MLProject/mlruns/735300066921634212
-creation_time: 1750040389959
-experiment_id: '735300066921634212'
-last_update_time: 1750040389959
-lifecycle_stage: active
-name: logistic_regression_experiment_local

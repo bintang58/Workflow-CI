@@ -73,7 +73,7 @@ def main(args):
     )
     print(f"📊 Training set: {X_train.shape}, Test set: {X_test.shape}")
 
-    mlflow.sklearn.autolog(disable=True)  # Disable autolog for manual logging
+    mlflow.sklearn.autolog()
 
     with start_run_with_retry(run_name="LogisticRegression_GridSearchCV") as run:
         run_id = run.info.run_id
