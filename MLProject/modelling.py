@@ -8,20 +8,18 @@ import mlflow
 import mlflow.sklearn
 import time
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score, 
+    accuracy_score, f1_score, precision_score, recall_score,
     classification_report, confusion_matrix
 )
 
 def load_data(data_path):
-    """Load dataset from the specified path."""
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"❌ Data file not found at {data_path}")
     return pd.read_csv(data_path)
 
 def setup_mlflow():
-    """Setup MLflow tracking, remote (DagsHub) or local."""
     dagshub_uri = "https://dagshub.com/bintang58/diabetes-prediction-model.mlflow"
     if os.getenv('DAGSHUB_TOKEN') and os.getenv('DAGSHUB_USERNAME'):
         os.environ['MLFLOW_TRACKING_USERNAME'] = os.getenv('DAGSHUB_USERNAME')
@@ -37,23 +35,19 @@ def setup_mlflow():
         print("⚠️ MLflow tracking fallback to local: ./mlruns")
         return False
 
-def start_run_with_retry(max_retries=5, wait_seconds=5):
-    """Start MLflow run with retry mechanism for handling connection errors."""
+def start_run_with_retry(run_name=None, max_retries=5, wait_seconds=5):
     for attempt in range(1, max_retries + 1):
         try:
             print(f"🔄 Attempt {attempt} to start MLflow run...")
-            return mlflow.start_run()
+            return mlflow.start_run(run_name=run_name)
         except Exception as e:
-            print(f"⚠️ Attempt {attempt} failed to start run: {e}")
+            print(f"⚠️ Attempt {attempt} failed: {e}")
             if attempt < max_retries:
-                print(f"⏳ Retrying in {wait_seconds} seconds...")
                 time.sleep(wait_seconds)
             else:
-                print("❌ Maximum retry attempts reached. Failed to start MLflow run.")
                 raise e
 
 def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds=5):
-    """Register MLflow model with retry mechanism for handling 500 errors."""
     for attempt in range(1, max_retries + 1):
         try:
             print(f"🔄 Attempt {attempt} to register model...")
@@ -63,35 +57,47 @@ def register_model_with_retry(model_uri, model_name, max_retries=5, wait_seconds
         except Exception as e:
             print(f"⚠️ Attempt {attempt} failed: {e}")
             if attempt < max_retries:
-                print(f"⏳ Retrying in {wait_seconds} seconds...")
                 time.sleep(wait_seconds)
             else:
-                print("❌ Maximum retry attempts reached. Model registration failed.")
                 raise e
 
 def main(args):
     use_remote_tracking = setup_mlflow()
 
-    # Load dataset
     df = load_data(args.data_path)
     X = df.drop(columns=['diabetes'])
     y = df['diabetes']
 
-    # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=args.test_size, random_state=args.random_state
     )
     print(f"📊 Training set: {X_train.shape}, Test set: {X_test.shape}")
 
-    mlflow.sklearn.autolog()
+    mlflow.sklearn.autolog(disable=True)  # Disable autolog for manual logging
 
-    with start_run_with_retry() as run:
+    with start_run_with_retry(run_name="LogisticRegression_GridSearchCV") as run:
         run_id = run.info.run_id
         print(f"🚀 MLflow Run ID: {run_id}")
 
-        # Train model
-        model = LogisticRegression(random_state=args.random_state)
-        model.fit(X_train, y_train)
+        # GridSearchCV Logistic Regression
+        param_grid = {
+            'C': [0.1, 1, 10],
+            'penalty': ['l2'],
+            'solver': ['lbfgs'],
+        }
+        grid = GridSearchCV(
+            LogisticRegression(random_state=args.random_state),
+            param_grid=param_grid,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=-1
+        )
+        grid.fit(X_train, y_train)
+        model = grid.best_estimator_
+
+        print(f"🔍 Best Params: {grid.best_params_}")
+        mlflow.log_params(grid.best_params_)  # log hasil GridSearchCV
+
         y_pred = model.predict(X_test)
 
         # Metrics
@@ -107,9 +113,9 @@ def main(args):
             "recall": recall
         })
 
-        # Log params
+        # Log params tambahan
         mlflow.log_params({
-            "model_type": "LogisticRegression",
+            "model_type": "LogisticRegression (GridSearchCV)",
             "test_size": args.test_size,
             "random_state": args.random_state
         })
@@ -121,7 +127,7 @@ def main(args):
             f.write(report)
         mlflow.log_artifact(report_path)
 
-        # Confusion matrix
+        # Confusion Matrix
         cm = confusion_matrix(y_test, y_pred)
         plt.figure(figsize=(6, 4))
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=[0, 1], yticklabels=[0, 1])
@@ -133,26 +139,23 @@ def main(args):
         plt.close()
         mlflow.log_artifact(cm_path)
 
-        # Save model manually
+        # Save Model
         os.makedirs(os.path.dirname(args.model_output), exist_ok=True)
         joblib.dump(model, args.model_output)
         mlflow.log_artifact(args.model_output)
         print(f"✅ Model saved at: {args.model_output}")
 
-        # Model Registry
+        # MLflow Model Registry
         model_uri = f"runs:/{run_id}/model"
         model_name = "diabetes-prediction-model"
-
         try:
             register_model_with_retry(model_uri=model_uri, model_name=model_name)
         except Exception as error:
-            print(f"❌ Model registry failed after retries: {error}")
+            print(f"❌ Model registry failed: {error}")
 
-        # Info
         if use_remote_tracking:
             print("\n🌐 MLflow Tracking on DagsHub:")
             print("🔗 https://dagshub.com/bintang58/diabetes-prediction-model.mlflow")
-            print("🚀 Serve Model Command:")
             print(f"mlflow models serve -m 'models:/{model_name}/latest' --port 5000")
         else:
             print("\n💻 Serve Locally:")
@@ -164,7 +167,7 @@ def main(args):
                 os.remove(file)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Logistic Regression for Diabetes Prediction")
+    parser = argparse.ArgumentParser(description="Train Logistic Regression with GridSearchCV for Diabetes Prediction")
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--test_size", type=float, default=0.2)
     parser.add_argument("--random_state", type=int, default=42)
