@@ -25,7 +25,7 @@ def setup_mlflow():
         os.environ['MLFLOW_TRACKING_USERNAME'] = os.getenv('DAGSHUB_USERNAME')
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv('DAGSHUB_TOKEN')
         mlflow.set_tracking_uri(dagshub_uri)
-        mlflow.set_experiment("logistic_regression_experiment_remote")
+        mlflow.set_experiment("logistic_regression_experiment")
         print("✅ Using remote MLflow tracking on DagsHub")
         return True
     else:
