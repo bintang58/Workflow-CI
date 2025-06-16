@@ -58,6 +58,7 @@ jobs:
             DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
         run: |
             mlflow run . -e run_model \
+              --experiment-name logistic_regression_experiment \
               -P data_path=diabetes-prediction_preprocessing.csv \
               -P model_output=models/diabetes-prediction-model.pkl
     

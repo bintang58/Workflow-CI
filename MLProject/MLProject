@@ -15,3 +15,5 @@ entry_points:
       --test_size {test_size}
       --random_state {random_state}
       --model_output {model_output}
+
+experiment_name: "logistic_regression_experiment"
